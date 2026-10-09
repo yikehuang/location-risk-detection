@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
-"""Send a synthetic Bristol-to-London jump to the local scoring API."""
+"""Send a named synthetic scenario to the local scoring API."""
 
+import argparse
 import json
 from urllib.request import Request, urlopen
 
-payload = {
-    "mock_location": False,
-    "integrity": {"verified": True, "device_verdicts": []},
-    "gps_location": {"lat": 51.4545, "lon": -2.5879},
-    "ip_location": {"lat": 51.5072, "lon": -0.1276},
-    "wifi": {"environment_changed": False},
-    "sensor_state": "stationary",
-    "trajectory": [
-        {"lat": 51.4545, "lon": -2.5879, "timestamp_s": 1000},
-        {"lat": 51.5072, "lon": -0.1276, "timestamp_s": 1005},
-    ],
-}
-request = Request("http://127.0.0.1:8000/score", data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"}, method="POST")
-with urlopen(request, timeout=5) as response:
-    print(response.read().decode())
+from scenarios import SCENARIOS, get_scenario_payload
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "scenario", nargs="?", choices=sorted(SCENARIOS), default="teleport",
+        help="synthetic scenario to submit (default: teleport)",
+    )
+    parser.add_argument("--url", default="http://127.0.0.1:8000/score")
+    args = parser.parse_args()
+
+    payload = get_scenario_payload(args.scenario)
+    request = Request(
+        args.url,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        print(response.read().decode())
+
+
+if __name__ == "__main__":
+    main()
