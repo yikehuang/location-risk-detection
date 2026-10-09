@@ -29,6 +29,12 @@ python3 -m unittest discover -s tests -v
 
 健康检查：`GET http://127.0.0.1:8000/health`。评分接口：`POST http://127.0.0.1:8000/score`。
 
+## 在 MuMu Player 中演示
+
+Windows 电脑安装 Python 3 并启动 MuMu Player 后，双击 `run_mumu_demo.bat`。脚本会启动本地评分服务、连接 MuMu 的 ADB 端口、把模拟器的 8000 端口反向转发到电脑，并在模拟器浏览器中打开场景测试页。页面可以切换正常步行、GPS 漂移、瞬移和 GPS/IP 不一致场景。
+
+脚本默认使用 MuMu Windows 安装路径 `C:\Program Files (x86)\Nemu\vmonitor\bin\adb_server.exe` 和 ADB 端口 `127.0.0.1:7555`。如果安装目录或多开实例端口不同，请编辑 `run_mumu_demo.bat` 中的 `ADB` 或 `SERIAL`。服务仅绑定电脑的 `127.0.0.1`，ADB 反向转发不需要把 API 暴露到局域网。
+
 ## 请求示例
 
 ```json
@@ -51,6 +57,7 @@ python3 -m unittest discover -s tests -v
 ## 当前边界
 
 - `demo_client.py` 发送的是合成数据；本项目还没有 Android 采集端。
+- MuMu 演示使用模拟器浏览器访问本地网页，不是原生 APK，也不会读取或修改 MuMu 的系统 GPS。MuMu 的 Windows ADB 连接与安装说明见[官方开发者手册](https://www.mumuplayer.com/help/win/developers-essentials-manual.html)；Android 官方文档介绍了使用 `adb reverse` 访问开发机本地服务的方式。
 - `FixedLocationProvider`、`SequenceLocationProvider` 和 `ScenarioLocationProvider` 仅用于确定性测试与本地演示，不会修改 Android 系统位置，也不能替代真机采集器。
 - `integrity.verified` 不能由客户端自行声明后直接信任。正式接入时，Android 客户端需要申请 Play Integrity token，后端向 Google 解码/校验 token，再从校验结果提取 verdict。当前服务仅为了本地演示评分规则。
 - Root、Hook、模拟器、IP 归属地和 Wi-Fi 变化都存在合法场景与误报可能，分数只能支持风险处置，不能单信某个字段作永久封禁依据。
