@@ -2,6 +2,8 @@
 
 这是一个用于比赛演示的服务端风险评分原型：客户端提交定位、环境、传感器和完整性信号；服务端计算多项风险并返回建议动作。项目只依赖 Python 3 标准库。
 
+评分服务通过 `LocationProvider` 接口读取 GPS 坐标。默认 HTTP 适配器从请求中读取坐标；单元测试可注入固定虚拟坐标，评分规则无需连接真实 GPS。后续 Android 采集端可实现相同接口并封装真机 GPS 数据。
+
 ## 启动
 
 在项目目录运行：
@@ -14,6 +16,12 @@ python3 server.py
 
 ```bash
 python3 demo_client.py
+```
+
+运行依赖注入单元测试：
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
 
 健康检查：`GET http://127.0.0.1:8000/health`。评分接口：`POST http://127.0.0.1:8000/score`。
