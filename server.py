@@ -6,9 +6,13 @@ from __future__ import annotations
 import json
 import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from location_provider import LocationProvider, RequestPayloadLocationProvider
+from scenarios import SCENARIOS, get_scenario_payload
+
+WEB_INDEX = Path(__file__).with_name("web") / "index.html"
 
 
 def distance_km(a: dict[str, Any], b: dict[str, Any]) -> float:
@@ -109,9 +113,26 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/":
+            try:
+                raw = WEB_INDEX.read_bytes()
+            except OSError:
+                return self._send(500, {"error": "demo_page_unavailable"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+        if self.path == "/scenarios":
+            scenarios = [
+                {"name": name, "payload": get_scenario_payload(name)}
+                for name in SCENARIOS
+            ]
+            return self._send(200, {"scenarios": scenarios})
         if self.path == "/health":
             return self._send(200, {"status": "ok", "service": "location-risk-demo"})
-        self._send(404, {"error": "not_found", "hint": "POST /score or GET /health"})
+        self._send(404, {"error": "not_found", "hint": "GET /, GET /health, or POST /score"})
 
     def do_POST(self) -> None:  # noqa: N802
         if self.path != "/score":
