@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Location Risk Lab</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #162033; background: #f2f5f9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px 14px 36px; }
+    main { width: min(100%, 560px); margin: 0 auto; }
+    header { padding: 18px 4px 14px; }
+    .eyebrow { color: #52637d; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 6px 0 8px; font-size: 28px; line-height: 1.15; }
+    header p { margin: 0; color: #52637d; line-height: 1.5; }
+    .card { background: white; border: 1px solid #dce3ed; border-radius: 16px; padding: 18px; box-shadow: 0 5px 18px #192d4a0a; }
+    label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    select, button { width: 100%; min-height: 48px; border-radius: 10px; font: inherit; }
+    select { padding: 0 12px; background: white; border: 1px solid #bac6d7; color: #162033; }
+    button { margin-top: 12px; border: 0; background: #2457d6; color: white; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .hint { margin: 12px 0 0; color: #65748b; font-size: 13px; line-height: 1.45; }
+    .result { margin-top: 14px; display: none; }
+    .result.visible { display: block; }
+    .score-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .score { font-size: 44px; font-weight: 800; line-height: 1; }
+    .score small { font-size: 14px; font-weight: 600; color: #65748b; }
+    .action { padding: 8px 10px; border-radius: 999px; background: #edf3ff; color: #214ab2; font-size: 13px; font-weight: 700; text-align: right; }
+    h2 { margin: 20px 0 8px; font-size: 16px; }
+    .signal { padding: 11px 0; border-top: 1px solid #e7ecf2; }
+    .signal strong { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+    .signal p { margin: 5px 0 0; color: #52637d; font-size: 13px; line-height: 1.4; }
+    .empty { color: #52637d; font-size: 14px; }
+    .error { color: #9f2636; }
+    footer { padding: 14px 5px 0; color: #65748b; font-size: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Location Risk Lab</div>
+      <h1>位置风险场景测试</h1>
+      <p>选择一组可重复的合成数据，查看服务端风险评分。</p>
+    </header>
+    <section class="card" aria-label="场景测试">
+      <label for="scenario">测试场景</label>
+      <select id="scenario" disabled><option>正在加载场景…</option></select>
+      <button id="run" disabled>运行风险评分</button>
+      <p class="hint">演示只提交合成坐标，不读取设备 GPS、Wi-Fi 或传感器。</p>
+    </section>
+    <section id="result" class="card result" aria-live="polite"></section>
+    <footer>本地比赛演示原型。评分用于验证自有检测规则，不代表真实设备定位结论。</footer>
+  </main>
+  <script>
+    const labels = {
+      "normal-walk": "正常步行",
+      "gps-drift": "GPS 轻微漂移",
+      "teleport": "异常瞬移",
+      "gps-ip-mismatch": "GPS 与 IP 不一致"
+    };
+    const select = document.querySelector("#scenario");
+    const run = document.querySelector("#run");
+    const result = document.querySelector("#result");
+    let scenarios = [];
+
+    function showReport(report) {
+      result.replaceChildren();
+      const row = document.createElement("div");
+      row.className = "score-row";
+      const score = document.createElement("div");
+      score.className = "score";
+      score.append(document.createTextNode(String(report.risk_score)));
+      const max = document.createElement("small");
+      max.textContent = " / 100 风险分";
+      score.append(max);
+      const action = document.createElement("div");
+      action.className = "action";
+      action.textContent = report.action;
+      row.append(score, action);
+      result.append(row);
+
+      const title = document.createElement("h2");
+      title.textContent = "评分信号";
+      result.append(title);
+      if (!report.signals.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = "没有触发风险信号。";
+        result.append(empty);
+      }
+      for (const signal of report.signals) {
+        const item = document.createElement("div");
+        item.className = "signal";
+        const heading = document.createElement("strong");
+        const code = document.createElement("span");
+        code.textContent = signal.code;
+        const points = document.createElement("span");
+        points.textContent = `+${signal.points}`;
+        heading.append(code, points);
+        const detail = document.createElement("p");
+        detail.textContent = signal.detail;
+        item.append(heading, detail);
+        result.append(item);
+      }
+      result.classList.add("visible");
+    }
+
+    async function loadScenarios() {
+      const response = await fetch("/scenarios");
+      if (!response.ok) throw new Error("无法读取场景列表");
+      const data = await response.json();
+      scenarios = data.scenarios;
+      select.replaceChildren(...scenarios.map(({name}) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = labels[name] || name;
+        return option;
+      }));
+      select.disabled = false;
+      run.disabled = false;
+    }
+
+    run.addEventListener("click", async () => {
+      run.disabled = true;
+      run.textContent = "正在评分…";
+      result.classList.add("visible");
+      result.textContent = "正在提交合成场景…";
+      try {
+        const scenario = scenarios.find(item => item.name === select.value);
+        const response = await fetch("/score", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(scenario.payload)
+        });
+        const report = await response.json();
+        if (!response.ok) throw new Error(report.error || "评分请求失败");
+        showReport(report);
+      } catch (error) {
+        result.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "error";
+        message.textContent = `请求失败：${error.message}`;
+        result.append(message);
+      } finally {
+        run.disabled = false;
+        run.textContent = "运行风险评分";
+      }
+    });
+
+    loadScenarios().catch(error => {
+      select.replaceChildren(new Option("加载失败，请重启本地服务", ""));
+      result.classList.add("visible");
+      result.textContent = error.message;
+    });
+  </script>
+</body>
+</html>
