@@ -8,6 +8,8 @@ import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from location_provider import LocationProvider, RequestPayloadLocationProvider
+
 
 def distance_km(a: dict[str, Any], b: dict[str, Any]) -> float:
     """Great-circle distance between two {lat, lon} coordinates."""
@@ -18,8 +20,15 @@ def distance_km(a: dict[str, Any], b: dict[str, Any]) -> float:
     return 6371.0 * 2 * math.asin(min(1.0, math.sqrt(h)))
 
 
-def score_report(payload: dict[str, Any]) -> dict[str, Any]:
-    """Score supplied signals. This demo does not authenticate client claims."""
+def score_report(
+    payload: dict[str, Any],
+    location_provider: LocationProvider | None = None,
+) -> dict[str, Any]:
+    """Score supplied signals using an injectable location source.
+
+    The default provider adapts the HTTP request. Tests can pass a fake provider
+    so scoring does not depend on a physical GPS device.
+    """
     score = 0
     signals: list[dict[str, Any]] = []
 
@@ -41,7 +50,9 @@ def score_report(payload: dict[str, Any]) -> dict[str, Any]:
         signals.append({"code": "INTEGRITY_UNVERIFIED", "points": 0,
                         "detail": "完整性字段尚未由服务端验证，本次不计入风险分。"})
 
-    gps, ip = payload.get("gps_location"), payload.get("ip_location")
+    provider = location_provider or RequestPayloadLocationProvider()
+    gps = provider.get_location(payload)
+    ip = payload.get("ip_location")
     if gps and ip:
         gap = distance_km(gps, ip)
         if gap > 3000:
